@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>28nm Node Risk-Adjusted Profitability Analyzer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 2rem;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.5;
+        }
+        .card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+        }
+        .parameters {
+            background: white;
+            border: 1px solid #e5e5e5;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .parameters h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin: 0 0 1rem 0;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #e5e5e5;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+        }
+        label {
+            display: block;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        .metrics-card {
+            background-color: #f8fafc;
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+        .metric-title {
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 500;
+        }
+        .metric-value.blue {
+            color: #2563eb;
+        }
+        .metric-value.red {
+            color: #dc2626;
+        }
+        .metric-value.green {
+            color: #16a34a;
+        }
+        .customer-card {
+            border: 1px solid #e5e5e5;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .customer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .risk-badge {
+            background-color: #fee2e2;
+            color: #991b1b;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+        }
+        .customer-metrics {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Customer Switching Risk and Profitability Analyzer</h1>
+        
+        <div class="parameters">
+            <h2>Foundry Parameters</h2>
+            <div class="grid-3">
+                <div>
+                    <label>Fab Capacity (wafers/month)</label>
+                    <input type="text" id="maxCapacity" value="100,000">
+                </div>
+                <div>
+                    <label>Wafer Production Cost ($)</label>
+                    <input type="number" id="manufacturingCost" value="1000">
+                </div>
+                <div>
+                    <label>Monthly Fixed Cost ($M)</label>
+                    <input type="number" id="fixedCost" value="20">
+                </div>
+            </div>
+        </div>
+
+        <div class="grid-3">
+            <div class="metrics-card">
+                <div class="metric-title">Current Utilization</div>
+                <div class="metric-value blue" id="utilization">90.0%</div>
+            </div>
+            <div class="metrics-card">
+                <div class="metric-title">Monthly Profit</div>
+                <div class="metric-value blue" id="monthlyProfit">$66.5M</div>
+            </div>
+            <div class="metrics-card">
+                <div class="metric-title">Margin %</div>
+                <div class="metric-value blue" id="margin">32.5%</div>
+            </div>
+        </div>
+
+        <div class="grid-3">
+            <div class="metrics-card">
+                <div class="metric-title">Profit at Risk</div>
+                <div class="metric-value red" id="profitAtRisk">$16.6M</div>
+            </div>
+            <div class="metrics-card">
+                <div class="metric-title">Risk-Adjusted Profit</div>
+                <div class="metric-value green" id="riskAdjustedProfit">$49.9M</div>
+            </div>
+            <div class="metrics-card">
+                <div class="metric-title">At-Risk Utilization</div>
+                <div class="metric-value blue" id="riskUtilization">4.5%</div>
+            </div>
+        </div>
+
+        <div id="customers"></div>
+    </div>
+
+    <script>
+        // Helper functions for number formatting
+        function formatNumber(num) {
+            return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+
+        function parseFormattedNumber(str) {
+            return Number(str.replace(/,/g, ''));
+        }
+
+        const customersData = [
+            {
+                name: 'Fabless Customer A',
+                monthlyAllocation: 35000,
+                currentPrice: 1900,
+                alternativePrice: 1800,
+                switchingCost: 100
+            },
+            {
+                name: 'Fabless Customer B',
+                monthlyAllocation: 25000,
+                currentPrice: 2100,
+                alternativePrice: 1950,
+                switchingCost: 150
+            },
+            {
+                name: 'Fabless Customer C',
+                monthlyAllocation: 30000,
+                currentPrice: 1850,
+                alternativePrice: 1800,
+                switchingCost: 120
+            }
+        ];
+
+        function createCustomerCard(customer, index) {
+            const card = document.createElement('div');
+            card.className = 'customer-card';
+            card.innerHTML = `
+                <div class="customer-header">
+                    <h3>${customer.name}</h3>
+                    <span class="risk-badge" id="risk-${index}">Switch Risk: 0.0%</span>
+                </div>
+                <div class="grid-2">
+                    <div>
+                        <label>Monthly Allocation</label>
+                        <input type="text" value="${formatNumber(customer.monthlyAllocation)}" 
+                               onchange="updateCustomer(${index}, 'monthlyAllocation', this.value)"
+                               onkeyup="this.value = formatNumber(parseFormattedNumber(this.value))">
+                    </div>
+                    <div>
+                        <label>Current Price ($)</label>
+                        <input type="number" value="${customer.currentPrice}"
+                               onchange="updateCustomer(${index}, 'currentPrice', this.value)">
+                    </div>
+                    <div>
+                        <label>Alternative Price ($)</label>
+                        <input type="number" value="${customer.alternativePrice}"
+                               onchange="updateCustomer(${index}, 'alternativePrice', this.value)">
+                    </div>
+                    <div>
+                        <label>Switching Cost ($M)</label>
+                        <input type="number" value="${customer.switchingCost}"
+                               onchange="updateCustomer(${index}, 'switchingCost', this.value)">
+                    </div>
+                </div>
+                <div class="customer-metrics">
+                    <div>Monthly Profit: <span id="profit-${index}">$0M</span></div>
+                    <div>Profit at Risk: <span id="risk-profit-${index}">$0M</span></div>
+                </div>
+            `;
+            return card;
+        }
+
+        function calculateCustomerMetrics(customer, manufacturingCost) {
+            const monthlyRevenue = customer.monthlyAllocation * customer.currentPrice;
+            const monthlyCost = customer.monthlyAllocation * manufacturingCost;
+            const monthlyProfit = monthlyRevenue - monthlyCost;
+            
+            const annualSaving = (customer.currentPrice - customer.alternativePrice) 
+                * customer.monthlyAllocation * 12;
+            const switchRisk = Math.min(100, (annualSaving / (customer.switchingCost * 1000000)) * 100);
+            
+            const profitAtRisk = monthlyProfit * (switchRisk / 100);
+
+            return {
+                monthlyProfit,
+                switchRisk,
+                profitAtRisk
+            };
+        }
+
+        function calculateMetrics() {
+            const maxCapacity = parseFormattedNumber(document.getElementById('maxCapacity').value);
+            const manufacturingCost = Number(document.getElementById('manufacturingCost').value);
+            const fixedCost = Number(document.getElementById('fixedCost').value) * 1000000;
+
+            let totalAllocation = 0;
+            let totalRevenue = 0;
+            let totalVariableCost = 0;
+            let totalProfitAtRisk = 0;
+            let volumeAtRisk = 0;
+
+            customersData.forEach((customer, index) => {
+                const metrics = calculateCustomerMetrics(customer, manufacturingCost);
+                
+                totalAllocation += customer.monthlyAllocation;
+                totalRevenue += customer.monthlyAllocation * customer.currentPrice;
+                totalVariableCost += customer.monthlyAllocation * manufacturingCost;
+                totalProfitAtRisk += metrics.profitAtRisk;
+                volumeAtRisk += customer.monthlyAllocation * (metrics.switchRisk / 100);
+
+                document.getElementById(`profit-${index}`).textContent = 
+                    `$${(metrics.monthlyProfit/1000000).toFixed(1)}M`;
+                document.getElementById(`risk-${index}`).textContent = 
+                    `Switch Risk: ${metrics.switchRisk.toFixed(1)}%`;
+                document.getElementById(`risk-profit-${index}`).textContent = 
+                    `$${(metrics.profitAtRisk/1000000).toFixed(1)}M`;
+            });
+
+            const totalCost = totalVariableCost + fixedCost;
+            const totalProfit = totalRevenue - totalCost;
+            const margin = ((totalRevenue - totalCost) / totalRevenue * 100);
+            const utilization = (totalAllocation / maxCapacity) * 100;
+            const riskAdjustedProfit = totalProfit - totalProfitAtRisk;
+            const utilizationAtRisk = (volumeAtRisk / maxCapacity) * 100;
+
+            document.getElementById('utilization').textContent = `${utilization.toFixed(1)}%`;
+            document.getElementById('monthlyProfit').textContent = `$${(totalProfit/1000000).toFixed(1)}M`;
+            document.getElementById('margin').textContent = `${margin.toFixed(1)}%`;
+            document.getElementById('profitAtRisk').textContent = `$${(totalProfitAtRisk/1000000).toFixed(1)}M`;
+            document.getElementById('riskAdjustedProfit').textContent = `$${(riskAdjustedProfit/1000000).toFixed(1)}M`;
+            document.getElementById('riskUtilization').textContent = `${utilizationAtRisk.toFixed(1)}%`;
+        }
+
+        function updateCustomer(index, field, value) {
+            customersData[index][field] = field === 'monthlyAllocation' ? 
+                parseFormattedNumber(value) : Number(value);
+            calculateMetrics();
+        }
+
+        // Initialize the calculator
+        document.addEventListener('DOMContentLoaded', () => {
+            const customersContainer = document.getElementById('customers');
+            customersData.forEach((customer, index) => {
+                customersContainer.appendChild(createCustomerCard(customer, index));
+            });
+            calculateMetrics();
+        });
+
+        // Add input formatting for max capacity
+        document.getElementById('maxCapacity').addEventListener('keyup', function() {
+            this.value = formatNumber(parseFormattedNumber(this.value));
+        });
+        document.getElementById('maxCapacity').addEventListener('change', calculateMetrics);
+        document.getElementById('manufacturingCost').addEventListener('change', calculateMetrics);
+        document.getElementById('fixedCost').addEventListener('change', calculateMetrics);
+    </script>
+</body>
+</html>
